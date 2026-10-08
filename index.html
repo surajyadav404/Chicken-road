@@ -18,6 +18,15 @@ Client structure: auth overlay -> enter() -> tabs (Chicken, Aviator, Flip, Top, 
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://*.supabase.co wss://*.supabase.co">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap">
+<meta name="description" content="Cross the road, cash out, climb the board. A free game with virtual coins only.">
+<meta name="theme-color" content="#12151f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta property="og:title" content="Chicken Casino Road">
+<meta property="og:description" content="Cross the road, cash out, climb the board. Free virtual-coin game.">
+<meta property="og:image" content="https://surajyadav404.github.io/Chicken-road/icon-512.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Chicken Casino Road</title>
 <style>: layout, per-game styles, tabs, admin panel, ban overlay
 - HTML: #stats (level, daily bonus), #note, #ann (announcement), #ban, #tabs, #chk (Chicken), #avi (Aviator), #flp (Flip), #adm (Admin)
@@ -730,6 +739,7 @@ async function boot(){
   const {data:{session}}=await sb.auth.getSession();
   if(session)await enter(session.user.id);else $('auth').hidden=false;
 }
+if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 boot();
 </script>
 </body>
