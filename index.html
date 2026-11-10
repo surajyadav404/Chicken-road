@@ -246,20 +246,48 @@ input,select{background:rgba(10,12,22,.7);border:1px solid rgba(255,255,255,.12)
         <span>Balance</span>
         <b id="wbal">0</b>
       </div>
-      <div class="ptitle" style="margin-top:10px">Deposit (₹ → coins)</div>
-      <div class="wamt">
-        <button data-amt="100">₹100</button>
-        <button data-amt="200">₹200</button>
-        <button data-amt="500">₹500</button>
-        <button data-amt="1000">₹1000</button>
-        <button data-amt="2000">₹2000</button>
-        <button data-amt="5000">₹5000</button>
+
+      <!-- DEPOSIT STEP 1: Amount selection -->
+      <div id="dep-step1">
+        <div class="ptitle" style="margin-top:10px">Deposit (₹ → coins)</div>
+        <div class="wamt">
+          <button data-amt="100">₹100</button>
+          <button data-amt="200">₹200</button>
+          <button data-amt="500">₹500</button>
+          <button data-amt="1000">₹1000</button>
+          <button data-amt="2000">₹2000</button>
+          <button data-amt="5000">₹5000</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <input id="wcustom" type="number" min="10" placeholder="Custom ₹ amount" inputmode="numeric">
+          <button id="wdep">Continue</button>
+        </div>
+        <small style="opacity:.75;text-align:left">1 ₹ = 1 coin • Min ₹10</small>
       </div>
-      <div class="row" style="margin-top:8px">
-        <input id="wcustom" type="number" min="10" placeholder="Custom ₹ amount" inputmode="numeric">
-        <button id="wdep">Pay</button>
+
+      <!-- DEPOSIT STEP 2: Payment instructions -->
+      <div id="dep-step2" hidden>
+        <div class="ptitle" style="margin-top:10px">Pay using UPI</div>
+        <div style="background:#1a1f35;border-radius:10px;padding:12px;margin:8px 0;text-align:center">
+          <div style="font-size:13px;opacity:.8">Order ID</div>
+          <div id="dep-order" style="font-size:22px;font-weight:700;color:#ffd75e;letter-spacing:1px">CR-XXXXXX</div>
+          <div style="font-size:13px;opacity:.8;margin-top:6px">Amount</div>
+          <div id="dep-amt" style="font-size:20px;font-weight:700">₹0</div>
+        </div>
+        <div style="text-align:center;margin:10px 0">
+          <img id="dep-qr" alt="UPI QR" style="width:180px;height:180px;border-radius:8px;background:#fff;padding:6px">
+        </div>
+        <button id="dep-paybtn" style="width:100%;background:#2f8f4e;font-size:16px;font-weight:700;margin-bottom:8px">Open UPI App</button>
+        <small style="opacity:.85;text-align:left;display:block;line-height:1.45">
+          1. UPI app mein amount + <b>Order ID</b> note mein aa jayega<br>
+          2. Payment complete karo<br>
+          3. Admin verify karke coins add karega<br>
+          4. Order ID ka screenshot rakh lo
+        </small>
+        <button id="dep-back" style="margin-top:10px;width:100%">← Back</button>
       </div>
-      <small style="opacity:.75;text-align:left">1 ₹ = 1 coin. After you pay, admin will add the coins.</small>
+
+      <!-- WITHDRAW -->
       <div class="ptitle" style="margin-top:14px">Withdraw</div>
       <div class="row">
         <input id="wout" type="number" min="100" placeholder="Coins to withdraw" inputmode="numeric">
@@ -342,6 +370,9 @@ input,select{background:rgba(10,12,22,.7);border:1px solid rgba(255,255,255,.12)
       <div class="row"><span class="lbl">Max win</span><input id="cfgw" type="number" min="1" value="100000"><button id="cfgsave">Save</button></div>
       <button id="csv">⬇ Export CSV</button>
     </div>
+    <div class="panel"><div class="ptitle">💰 Deposit Requests</div>
+      <div id="dlist"><small>No pending deposits</small></div>
+    </div>
     <div class="panel"><div class="ptitle">💸 Withdrawal Requests</div>
       <div id="wlist"><small>No pending requests</small></div>
     </div>
@@ -406,7 +437,13 @@ function build(){
 function place(){const left=(pos||playing)?lc(pos)-32:20;hen.style.left=left+'px';track.style.transform='translateX('+(-Math.max(0,left-$('view').clientWidth*.3))+'px)'}
 function hop(){sfx.hop();document.querySelectorAll('.amb').forEach(e=>{if(+e.dataset.k<=pos+1)e.remove()});hen.classList.remove('hop');void hen.offsetWidth;hen.classList.add('hop')}
 function fresh(){pos=0;win=0;$('hs').innerHTML=CHICK(0);$('hs').classList.remove('dead');car.innerHTML='';car.style.transition='none';car.style.top='-200px';document.querySelectorAll('.lane').forEach(l=>l.classList.remove('ok'));place()}
-function home(){if(playing||busy)return;const w=win;fresh();win=w;ui()}
+function home(){
+  if(playing||busy)return;
+  const w=win;
+  fresh();
+  win=w;
+  ui();
+}
 async function crash(){sfx.horn();
   const v=VEHS[Math.floor(Math.random()*VEHS.length)];
   car.innerHTML=v.s;car.style.left=(lc(pos)-v.w/2)+'px';car.style.transition='none';car.style.top=(-v.h-10)+'px';
@@ -420,6 +457,7 @@ async function go(){
   try{
     if(!playing){
       const d=$('dif').value,b=Math.floor(+$('bet').value);
+      if(!(b>=1)){note('Bet at least 1 coin');busy=false;ui();return}
       await rpc('chicken_start',{p_bet:b,p_diff:d});
       cdiff=d;cbet=b;playing=true;build();fresh();say('On the road! Press GO to cross.');place();hop();await sleep(380);
     }else{
@@ -428,12 +466,24 @@ async function go(){
       else if(r.status==='won'){$('l'+pos).classList.add('ok');playing=false;win=r.win;celebrate(r.win,cbet);say('Last lane! You won +'+r.win);setTimeout(home,2500)}
       else await crash();
     }
-  }catch(e){}
+  }catch(e){
+    console.error('Chicken GO error:',e);
+    // rpc already shows note(error.message). Keep playing state so user can retry.
+  }
   busy=false;ui();
 }
 async function cashC(){
   if(busy||!playing||pos<1)return;busy=true;ui();
-  try{const r=await rpc('chicken_cashout');playing=false;win=r.win;celebrate(r.win,cbet);say('You won! +'+r.win+' ('+r.mult.toFixed(2)+'x)');setTimeout(home,1800)}catch(e){}
+  try{
+    const r=await rpc('chicken_cashout');
+    playing=false;win=r.win;
+    celebrate(r.win,cbet);
+    say('You won! +'+r.win+' ('+r.mult.toFixed(2)+'x)');
+    setTimeout(home,1800);
+  }catch(e){
+    console.error('Cashout error:',e);
+    // Keep playing=true so user can try cashout again or continue
+  }
   busy=false;ui();
 }
 async function resumeC(){
@@ -461,10 +511,14 @@ $('abtn').onclick=async()=>{
     if(av.st==='fly')applyA(await rpc('aviator_cashout'));
     else if(av.st==='idle'||av.st==='crash'||av.st==='won'){
       const a=+$('aut').value,b=Math.floor(+$('abet').value);
+      if(!(b>=1)){note('Bet at least 1 coin');aBusy=false;return}
       const r=await rpc('aviator_bet',{p_bet:b,p_auto:a>=1.01?a:null});
       av={st:'wait',t0:performance.now()+r.start_in_ms,m:1,bet:b};pts=[];amsg('Bet placed. Take-off soon!');
     }
-  }catch(e){}
+  }catch(e){
+    console.error('Aviator error:',e);
+    // rpc already showed the error message
+  }
   aBusy=false;
 };
 setInterval(()=>{if(aBusy||!me||!(av.st==='wait'||av.st==='fly'))return;rpc('aviator_state').then(applyA).catch(()=>{})},600);
@@ -519,17 +573,31 @@ async function flip(side){
   if(fl.busy)return;fl.busy=true;fui();
   const c=$('coin');c.textContent='';c.classList.remove('spin');void c.offsetWidth;c.classList.add('spin');sfx.flip();
   try{
-    const [r]=await Promise.all([rpc('flip_guess',{p_side:side,p_bet:fl.on?null:Math.floor(+$('fbet').value)}),sleep(800)]);
+    const betVal = fl.on ? null : Math.floor(+$('fbet').value);
+    if(!fl.on && !(betVal>=1)){note('Bet at least 1 coin');fl.busy=false;fui();return}
+    const [r]=await Promise.all([rpc('flip_guess',{p_side:side,p_bet:betVal}),sleep(800)]);
     c.textContent=r.result==='Heads'?'👑':'🦅';
     if(r.status==='alive'){fl.on=true;fl.n=r.streak;fl.bet=+r.bet;fmsg('Correct! It was '+r.result+'. Streak '+r.streak)}
-    else if(r.status==='won'){celebrate(r.win,Math.floor(+$('fbet').value));fl={on:false,n:0,bet:0,busy:true};fmsg('Max streak! You won +'+r.win)}
+    else if(r.status==='won'){celebrate(r.win,fl.bet||betVal);fl={on:false,n:0,bet:0,busy:true};fmsg('Max streak! You won +'+r.win)}
     else{lossFx();fl={on:false,n:0,bet:0,busy:true};fmsg('It was '+r.result+'. Bet lost')}
-  }catch(e){c.textContent='?'}
+  }catch(e){
+    console.error('Flip error:',e);
+    c.textContent='?';
+    // Keep fl state so user can retry
+  }
   fl.busy=false;fui();
 }
 async function cashF(){
   if(fl.busy||!fl.on||fl.n<1)return;fl.busy=true;fui();
-  try{const r=await rpc('flip_cashout');celebrate(r.win,fl.bet);fmsg('Cash out! +'+r.win+' ('+r.mult.toFixed(2)+'x)');fl={on:false,n:0,bet:0,busy:true}}catch(e){}
+  try{
+    const r=await rpc('flip_cashout');
+    celebrate(r.win,fl.bet);
+    fmsg('Cash out! +'+r.win+' ('+r.mult.toFixed(2)+'x)');
+    fl={on:false,n:0,bet:0,busy:true};
+  }catch(e){
+    console.error('Flip cashout error:',e);
+    // Keep fl.on so user can retry cashout
+  }
   fl.busy=false;fui();
 }
 async function resumeF(){const g=await rpc('flip_state');if(!g.active)return;fl={on:true,n:+g.streak,bet:+g.bet,busy:false};fmsg('Game restored. Pick a side or cash out.');fui()}
@@ -572,8 +640,30 @@ async function lboard(){
 }
 /* ---------- Admin (every action is re-checked on the server) ---------- */
 function rlog(rows){const b=$('alog');b.textContent='';if(!rows||!rows.length){b.append(el('small','No actions yet'));return}rows.forEach(l=>b.append(el('small',ago(Date.parse(l.ts))+' · '+l.action)))}
-async function aload(){if(!me||!me.is_admin)return;try{PL=await rpc('admin_list_players');arender();rlog(await rpc('admin_activity'));renderWD()}catch(e){try{renderWD()}catch(_){}}}
-async function adm(fn,args,msg){try{await rpc(fn,args);if(msg)note(msg);await loadMe();await aload()}catch(e){}}
+async function aload(){
+  if(!me||!me.is_admin)return;
+  try{
+    PL=await rpc('admin_list_players');
+    arender();
+    rlog(await rpc('admin_activity'));
+    renderWD();
+    renderDeposits();
+  }catch(e){
+    try{renderWD()}catch(_){}
+    try{renderDeposits()}catch(_){}
+  }
+}
+async function adm(fn,args,msg){
+  try{
+    await rpc(fn,args);
+    if(msg)note(msg);
+    await loadMe();
+    await aload();
+  }catch(e){
+    console.error('Admin action failed:',e);
+    // rpc already shows note
+  }
+}
 const amt=()=>Math.max(1,Math.floor(+$('amt').value||0));
 function arender(){
   const cn=r=>+r.p_coins||0,seen=r=>Date.parse(r.p_seen)||0,on=r=>Date.now()-seen(r)<6e5;
@@ -674,7 +764,7 @@ ambient();
 /* ---------- DEMO backend: same API as the Supabase one, runs locally (NOT secure, for trying the UI only) ---------- */
 function demoBackend(){
   const K='cdb-demo2';let S;try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
-  if(!S){S={users:{},cred:{},sess:null,cfg:{start_coins:1000,daily_base:100,max_bet:1000,max_win:100000,announcement:''},cg:{},fg:{},ag:{},log:[]};
+  if(!S){S={users:{},cred:{},sess:null,cfg:{start_coins:1000,daily_base:100,max_bet:1000,max_win:100000,announcement:''},cg:{},fg:{},ag:{},log:[],deposits:[],withdrawals:[]};
     [['Rahul',3200,40],['Priya',1450,18],['Amit',820,9],['Neha',5100,75]].forEach(([n,c,x],i)=>{S.users['d'+i]={id:'d'+i,username:n,coins:c,xp:x,streak:0,last_daily:null,is_admin:false,banned:false,seen:Date.now()-i*900000,la:0}})}
   const sv=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
   const rnd=()=>crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;
@@ -727,7 +817,67 @@ function demoBackend(){
     admin_set_ban({p_user,p_banned}){const a=adm();if(p_user===a.id)E('you cannot ban yourself');const u=S.users[p_user]||E('no such player');u.banned=p_banned;alog((p_banned?'Banned ':'Unbanned ')+u.username);return {ok:true}},
     admin_set_config({p_start,p_daily,p_max_bet,p_max_win}){adm();Object.assign(S.cfg,{start_coins:p_start,daily_base:p_daily,max_bet:p_max_bet,max_win:p_max_win});alog('Settings updated');return {ok:true}},
     admin_set_announcement({p_text}){adm();S.cfg.announcement=String(p_text||'').slice(0,200);alog(p_text?'Posted announcement':'Cleared announcement');return {ok:true}},
-    admin_activity(){adm();return S.log.slice(0,30)}
+    admin_activity(){adm();return S.log.slice(0,30)},
+    // Local deposit support (demo mode)
+    request_deposit({p_amount}){
+      const p=lock();
+      if(p_amount<10)E('minimum deposit ₹10');
+      if(p_amount>50000)E('maximum deposit ₹50000');
+      if(!S.deposits)S.deposits=[];
+      const order_id='CR-'+Math.random().toString(36).slice(2,8).toUpperCase();
+      S.deposits.unshift({id:order_id,order_id,user_id:p.id,username:p.username,amount:p_amount,status:'pending',created_at:new Date().toISOString()});
+      return {ok:true,order_id,amount:p_amount,id:order_id};
+    },
+    admin_list_deposits(){
+      adm();
+      return (S.deposits||[]).filter(d=>d.status==='pending').slice(0,50);
+    },
+    admin_process_deposit({p_order_id,p_approve}){
+      adm();
+      const d=(S.deposits||[]).find(x=>x.order_id===p_order_id && x.status==='pending');
+      if(!d)E('deposit not found or already processed');
+      if(p_approve){
+        const u=S.users[d.user_id];
+        if(u){u.coins+=d.amount;alog('Deposit approved +'+d.amount+' to '+d.username+' ('+p_order_id+')')}
+        d.status='paid';
+      }else{
+        d.status='rejected';
+        alog('Deposit rejected '+p_order_id);
+      }
+      return {ok:true,order_id:p_order_id,approved:!!p_approve};
+    },
+    // Withdrawal support for demo mode
+    request_withdrawal({p_amount,p_upi}){
+      const p=lock();
+      if(p_amount<100)E('minimum withdrawal 100 coins');
+      if(p.coins<p_amount)E('not enough coins');
+      if(!p_upi||p_upi.indexOf('@')<1)E('valid UPI ID required');
+      if(!S.withdrawals)S.withdrawals=[];
+      const pending=(S.withdrawals||[]).filter(w=>w.user_id===p.id&&w.status==='pending').length;
+      if(pending>=3)E('Too many pending withdrawals. Wait for admin.');
+      S.withdrawals.unshift({id:crypto.randomUUID?crypto.randomUUID():('w'+Date.now()),user_id:p.id,username:p.username,amount:p_amount,upi:p_upi,status:'pending',created_at:new Date().toISOString()});
+      return {ok:true};
+    },
+    admin_list_withdrawals(){
+      adm();
+      return (S.withdrawals||[]).filter(w=>w.status==='pending').slice(0,50);
+    },
+    admin_process_withdrawal({p_id,p_approve}){
+      adm();
+      const w=(S.withdrawals||[]).find(x=>x.id===p_id&&x.status==='pending');
+      if(!w)E('request not found or already processed');
+      if(p_approve){
+        const u=S.users[w.user_id];
+        if(!u||u.coins<w.amount)E('player does not have enough coins anymore');
+        u.coins-=w.amount;
+        w.status='paid';
+        alog('Withdrawal paid '+w.amount+' to '+w.username);
+      }else{
+        w.status='rejected';
+        alog('Withdrawal rejected');
+      }
+      return {ok:true};
+    }
   };
   return {
     auth:{
@@ -770,70 +920,195 @@ $('reg').onclick=async()=>{
   if(!data.session)return err('Check your email to confirm your account, then log in.');
   enter(data.user.id);
 };
-/* ---------- Wallet / UPI (7042027212@ybl) ---------- */
+/* ---------- Wallet / Improved Manual UPI Deposit ---------- */
 const MY_UPI='7042027212@ybl', MY_NAME='Chicken Casino Road';
-const WKEY='cdb-withdrawals';
-function loadWD(){try{return JSON.parse(localStorage.getItem(WKEY)||'[]')}catch(e){return []}}
-function saveWD(arr){try{localStorage.setItem(WKEY,JSON.stringify(arr))}catch(e){}}
+let currentDep = null; // {order_id, amount, upiUrl}
+
 function openWallet(){
   if(!me)return;
   $('wbal').textContent=Number(me.coins).toLocaleString()+' coins';
+  // Reset to step 1
+  $('dep-step1').hidden=false;
+  $('dep-step2').hidden=true;
+  currentDep=null;
   $('wallet').hidden=false;
 }
 function closeWallet(){$('wallet').hidden=true}
 $('coinchip').onclick=openWallet;
 $('wclose').onclick=closeWallet;
 $('wallet').onclick=e=>{if(e.target.id==='wallet')closeWallet()};
-function upiPay(amount){
-  amount=Math.max(10,Math.floor(+amount||0));
-  if(!amount)return note('Enter a valid amount (min ₹10)');
-  const url=`upi://pay?pa=${encodeURIComponent(MY_UPI)}&pn=${encodeURIComponent(MY_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent('Deposit '+amount+' coins')}`;
-  window.location.href=url;
-  setTimeout(()=>note('UPI app open nahi hua to manually pay karo: '+MY_UPI+' (₹'+amount+')'),1500);
-  closeWallet();
-}
-document.querySelectorAll('.wamt button').forEach(b=>{b.onclick=()=>upiPay(b.dataset.amt)});
-$('wdep').onclick=()=>upiPay($('wcustom').value);
-$('wreq').onclick=()=>{
-  const amt=Math.floor(+$('wout').value||0), upi=$('wupi').value.trim();
-  if(amt<100)return note('Minimum withdrawal 100 coins');
-  if(!me||me.coins<amt)return note('Not enough coins');
-  if(!upi||!upi.includes('@'))return note('Valid UPI ID dalo (example: name@ybl)');
-  const list=loadWD();
-  list.unshift({id:Date.now()+''+Math.random().toString(36).slice(2,7), uid:UID, uname:me.username||'Player', amt, upi, ts:new Date().toISOString(), status:'pending'});
-  saveWD(list);
-  note('Withdrawal request: '+amt+' coins → '+upi+'. Admin process karega.');
-  closeWallet();
-  if(me&&me.is_admin)renderWD();
-};
-function renderWD(){
-  const box=$('wlist'); if(!box)return;
-  const list=loadWD().filter(x=>x.status==='pending');
-  box.textContent='';
-  if(!list.length){box.append(el('small','No pending requests'));return}
-  list.forEach(r=>{
-    const d=document.createElement('div'); d.className='prow';
-    const info=document.createElement('div'); info.className='pinfo';
-    info.append(el('div',r.uname+' · '+Number(r.amt).toLocaleString()+' coins'), el('small',r.upi+' · '+ago(Date.parse(r.ts))));
-    const acts=document.createElement('div'); acts.className='acts';
-    const ok=el('button','✓'); ok.title='Approve (deduct coins)'; ok.style.background='#2f8f4e';
-    ok.onclick=async()=>{
-      try{
-        await adm('admin_adjust',{p_user:r.uid, p_delta:-r.amt}, 'Paid '+r.amt+' to '+r.uname+' ('+r.upi+')');
-        const all=loadWD(); const x=all.find(i=>i.id===r.id); if(x)x.status='paid'; saveWD(all); renderWD();
-      }catch(e){note('Approve failed – player coins check karo')}
+
+// Create deposit order then show payment screen
+async function startDeposit(amount){
+  amount = Math.floor(+amount||0);
+  if(amount < 10) return note('Minimum deposit ₹10');
+  if(amount > 50000) return note('Maximum deposit ₹50000');
+  try{
+    const r = await rpc('request_deposit', {p_amount: amount});
+    currentDep = {
+      order_id: r.order_id,
+      amount: r.amount,
+      upiUrl: `upi://pay?pa=${encodeURIComponent(MY_UPI)}&pn=${encodeURIComponent(MY_NAME)}&am=${r.amount}&cu=INR&tn=${encodeURIComponent(r.order_id)}`
     };
-    const no=el('button','✕'); no.title='Reject'; no.style.background='#b83a3a';
-    no.onclick=()=>{const all=loadWD(); const x=all.find(i=>i.id===r.id); if(x)x.status='rejected'; saveWD(all); renderWD(); note('Request rejected')};
-    acts.append(ok,no); d.append(info,acts); box.append(d);
-  });
+    // Show step 2
+    $('dep-order').textContent = currentDep.order_id;
+    $('dep-amt').textContent = '₹' + currentDep.amount;
+    $('dep-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=' + encodeURIComponent(currentDep.upiUrl);
+    $('dep-step1').hidden = true;
+    $('dep-step2').hidden = false;
+  }catch(e){
+    console.error(e);
+    // rpc already showed note
+  }
+}
+
+document.querySelectorAll('.wamt button').forEach(b=>{
+  b.onclick = () => startDeposit(b.dataset.amt);
+});
+$('wdep').onclick = () => startDeposit($('wcustom').value);
+$('dep-paybtn').onclick = () => {
+  if(!currentDep) return;
+  window.location.href = currentDep.upiUrl;
+  setTimeout(()=> note('UPI app nahi khula to manually pay karo: '+MY_UPI+' • Amount ₹'+currentDep.amount+' • Note mein Order ID: '+currentDep.order_id), 2000);
+};
+$('dep-back').onclick = () => {
+  $('dep-step1').hidden = false;
+  $('dep-step2').hidden = true;
+  currentDep = null;
+};
+
+// Withdrawal - now fully Supabase based
+$('wreq').onclick = async () => {
+  const amt = Math.floor(+$('wout').value || 0);
+  const upi = $('wupi').value.trim();
+  if (amt < 100) return note('Minimum withdrawal 100 coins');
+  if (!me || me.coins < amt) return note('Not enough coins');
+  if (!upi || !/^[a-zA-Z0-9.\-_]{2,}@[a-zA-Z]{2,}$/.test(upi)) {
+    return note('Valid UPI ID dalo (example: name@ybl)');
+  }
+  try {
+    await rpc('request_withdrawal', { p_amount: amt, p_upi: upi });
+    note('Withdrawal request bhej diya: ' + amt + ' coins → ' + upi);
+    closeWallet();
+    if (me && me.is_admin) renderWD();
+  } catch (e) {
+    // rpc already shows the error message
+  }
+};
+
+async function renderWD() {
+  const box = $('wlist');
+  if (!box) return;
+  box.textContent = '';
+  try {
+    const list = await rpc('admin_list_withdrawals');
+    if (!list || !list.length) {
+      box.append(el('small', 'No pending requests'));
+      return;
+    }
+    list.forEach(r => {
+      const d = document.createElement('div');
+      d.className = 'prow';
+      const info = document.createElement('div');
+      info.className = 'pinfo';
+      info.append(
+        el('div', (r.username || '?') + ' · ' + Number(r.amount).toLocaleString() + ' coins'),
+        el('small', r.upi + ' · ' + ago(Date.parse(r.created_at)))
+      );
+      const acts = document.createElement('div');
+      acts.className = 'acts';
+      const ok = el('button', '✓');
+      ok.title = 'Approve & deduct coins';
+      ok.style.background = '#2f8f4e';
+      ok.onclick = async () => {
+        try {
+          await rpc('admin_process_withdrawal', { p_id: r.id, p_approve: true });
+          note('Withdrawal paid: ' + r.amount + ' to ' + r.username);
+          await loadMe();
+          renderWD();
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      const no = el('button', '✕');
+      no.title = 'Reject';
+      no.style.background = '#b83a3a';
+      no.onclick = async () => {
+        try {
+          await rpc('admin_process_withdrawal', { p_id: r.id, p_approve: false });
+          note('Withdrawal rejected');
+          renderWD();
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      acts.append(ok, no);
+      d.append(info, acts);
+      box.append(d);
+    });
+  } catch (e) {
+    box.append(el('small', 'Could not load withdrawals'));
+  }
+}
+
+// Deposit requests for Admin
+async function renderDeposits(){
+  const box = $('dlist');
+  if(!box) return;
+  box.textContent = '';
+  try{
+    const list = await rpc('admin_list_deposits');
+    if(!list || !list.length){
+      box.append(el('small','No pending deposits'));
+      return;
+    }
+    list.forEach(r=>{
+      const d = document.createElement('div'); d.className='prow';
+      const info = document.createElement('div'); info.className='pinfo';
+      info.append(
+        el('div', (r.username||'?') + ' · ₹' + Number(r.amount).toLocaleString()),
+        el('small', r.order_id + ' · ' + ago(Date.parse(r.created_at)))
+      );
+      const acts = document.createElement('div'); acts.className='acts';
+      const ok = el('button','✓'); ok.title='Mark Paid + Credit coins'; ok.style.background='#2f8f4e';
+      ok.onclick = async ()=>{
+        try{
+          await rpc('admin_process_deposit', {p_order_id: r.order_id, p_approve: true});
+          note('Deposit approved: ₹'+r.amount+' credited to '+r.username);
+          await loadMe();
+          renderDeposits();
+        }catch(e){ console.error(e); }
+      };
+      const no = el('button','✕'); no.title='Reject'; no.style.background='#b83a3a';
+      no.onclick = async ()=>{
+        try{
+          await rpc('admin_process_deposit', {p_order_id: r.order_id, p_approve: false});
+          note('Deposit rejected: '+r.order_id);
+          renderDeposits();
+        }catch(e){ console.error(e); }
+      };
+      acts.append(ok, no);
+      d.append(info, acts);
+      box.append(d);
+    });
+  }catch(e){
+    box.append(el('small','Could not load deposits'));
+  }
 }
 
 async function boot(){
   $('alogo').innerHTML=CHICK(0);$('bet').value=10;build();fresh();tab('t1');requestAnimationFrame(aloop);
-  if(DEMO_MODE)err('Demo mode: data stays on this device only. The first account you register becomes admin.');
-  const {data:{session}}=await sb.auth.getSession();
-  if(session)await enter(session.user.id);else $('auth').hidden=false;
+  if(DEMO_MODE){
+    err('⚠️ DEMO MODE: Saara data is device pe hi rahega. Pehla account admin banega. Real multiplayer ke liye Supabase connect karo.');
+  }
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(session)await enter(session.user.id);else $('auth').hidden=false;
+  }catch(e){
+    console.error('Boot session error',e);
+    $('auth').hidden=false;
+    note('Login load nahi hua. Refresh try karo.');
+  }
 }
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 boot();
